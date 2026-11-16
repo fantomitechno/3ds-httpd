@@ -3,15 +3,11 @@
 #include <stdio.h>
 #include <string.h>
 void manual(int page) {
-	const char *manual[7];
+	const char *manual[3];
 	//TODO: Move manual pages into handlers
-	manual[0] = "Loaded handlers:\n-Default Handler\n-Favicon Handler\n-System Handler\n-SDMC Handler\n-Memory R/W Handler\n-Encryption Handler";
-	manual[1] = "Default Handler\nPath: /\nDescription: Returns a hardcoded HTML response";
-	manual[2] = "Favicon Handler\nPath: /favicon.ico\nDescription: Returns a hardcoded SVG favicon";
-	manual[3] = "System Handler\nPath: /system/\nDescription: /system/exit - Exits app\n/system/reboot - Reboots system";
-	manual[4] = "SDMC Handler\nPath: /sdcard/\nDescription: Returns content of requested file in SD Card with content-type text/html, if file is missing returns 404. Path starts at SDMC root";
-	manual[5] = "Memory RW Handler\nPath: /readmem/ || /writemem/\nDescription: Reads and writes system memory.\nHonestly you're more likely to crash your 3DS. Check source code for details";
-	manual[6] = "Encryption Handler\nPath: /crypt/\n Description: Uses native AES Encryption/Decryption Algorithms to do CBC/CTR/CTM. Check source code for details.";
+	manual[0] = "Loaded handlers:\n-System Handler\n-SDMC Handler";
+	manual[1] = "System Handler\nPath: /system/\nDescription: /system/exit - Exits app\n/system/reboot - Reboots system";
+	manual[2] = "SDMC Handler\nPath: /sdcard/\nDescription: Returns content of requested file in SD Card with content-type text/html, if file is missing returns 404. Path starts at SDMC root";
 	clearBottom();
 	printBottom("eManual page %i\n%s\n\nPress L for previous page or R for next page.\nPress X to change port or START to exit.",page,manual[page]);
 	gfxFlushBuffers();
@@ -62,12 +58,12 @@ int	main(int ac, char **av)
 		
 		if (kDown & KEY_L) {
 			manualpage--;
-			if (manualpage < 0) manualpage = 6;
+			if (manualpage < 0) manualpage = 2;
 			manual(manualpage);
 		}
 		if (kDown & KEY_R) {
 			manualpage++;
-			if (manualpage > 6) manualpage = 0;
+			if (manualpage > 2) manualpage = 0;
 			manual(manualpage);
 		}
 	}
