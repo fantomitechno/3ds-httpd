@@ -21,7 +21,7 @@ http_response *get_system_handler_response(http_request *request)
 	char	*payload = memalloc(1024 * sizeof(char));
 	if (!strcmp(request->path, "/system/info"))
 	{
-		sprintf(payload, "<html><title>System info</title><h1>Yes this is running on a 3DS</h1><p>Running firmware %lu</p></html>", osGetFirmVersion());
+		sprintf(payload, "<html><title>System info</title><h1>Yes this is running on a New Nintendo 2DS XL</h1><p>Running firmware version %lu</p><p>Free ram: %lu / %lu kb</p><p>Internet connection: %u / 3</p></html>", osGetFirmVersion(), osGetMemRegionFree(0) / 1024 / 1024, osGetMemRegionSize(0) / 1024 / 1024, osGetWifiStrength());
 	} else
 	{
 		sprintf(payload, "OK");
