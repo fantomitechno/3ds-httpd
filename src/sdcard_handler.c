@@ -47,8 +47,8 @@ http_response *get_sdcard_response(http_request *request)
 	snprintf(path, sizeof(path), "sdmc:/3ds/www%s", request->path);
 	char *payload = do_sdcard_request(path);
 	response->code = (payload == NULL) ? 200 : 404;
-	const char content_type[] = "Content-Type: text/html\r\n";
-	response->content_type = memdup(content_type, sizeof(content_type));
+	// const char content_type[] = "Content-Type: text/html\r\n";
+	// response->content_type = memdup(content_type, sizeof(content_type));
 	response->payload = payload;
 	response->payload_len = strlen(payload);
 	return response;    
