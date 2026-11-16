@@ -1,5 +1,51 @@
 #include "handlers.h"
 #include <3ds.h>
+#include <strings.h>
+#include <sys/stat.h>
+
+#define WWW_ROOT "sdmc:/3ds/www"
+
+static const struct { const char *ext; const char *type; } mime_types[] = {
+	{ "html",  "text/html; charset=utf-8" },
+	{ "htm",   "text/html; charset=utf-8" },
+	{ "css",   "text/css; charset=utf-8" },
+	{ "js",    "text/javascript; charset=utf-8" },
+	{ "mjs",   "text/javascript; charset=utf-8" },
+	{ "json",  "application/json" },
+	{ "txt",   "text/plain; charset=utf-8" },
+	{ "xml",   "application/xml" },
+	{ "svg",   "image/svg+xml" },
+	{ "png",   "image/png" },
+	{ "jpg",   "image/jpeg" },
+	{ "jpeg",  "image/jpeg" },
+	{ "gif",   "image/gif" },
+	{ "webp",  "image/webp" },
+	{ "ico",   "image/x-icon" },
+	{ "woff",  "font/woff" },
+	{ "woff2", "font/woff2" },
+	{ "wasm",  "application/wasm" },
+	{ "mp3",   "audio/mpeg" },
+	{ "wav",   "audio/wav" },
+	{ "mp4",   "video/mp4" },
+	{ "pdf",   "application/pdf" },
+};
+
+static const char *get_mime_type(const char *path)
+{
+	const char *slash = strrchr(path, '/');
+	const char *dot = strrchr(path, '.');
+
+	// no extension, or the dot belongs to a folder name
+	if (!dot || (slash && dot < slash))
+		return "application/octet-stream";
+
+	dot++;
+	for (size_t i = 0; i < sizeof(mime_types) / sizeof(mime_types[0]); i++)
+		if (strcasecmp(dot, mime_types[i].ext) == 0)
+			return mime_types[i].type;
+
+	return "application/octet-stream";
+}
 
 int is_sdcard_handler(http_request *request)
 {
@@ -8,48 +54,96 @@ int is_sdcard_handler(http_request *request)
 
 	return 1;
 }
-char *do_sdcard_request(char *path)
+
+static char *do_sdcard_request(char *path, size_t *out_size)
 {
-	const char *realPath = path;
-	
-	FILE *fptr = fopen(realPath,"r");
-	//Thanks to Evie for helping me clean this clusterf*ck
+	FILE *fptr = fopen(path, "rb");
 	if (fptr == NULL)
-	{
-		return "";
-	}
-	fseek(fptr,0,SEEK_END);
+		return NULL;
+
+	fseek(fptr, 0, SEEK_END);
 	size_t fileSize = ftell(fptr);
-	//printTop("size_t: %u",fileSize);
 	fseek(fptr, 0, SEEK_SET);
-	
-	/*
-	Handle fptr;
-	u64 fileSize;
-	FSUSER_OpenFileDirectly(&fptr,ARCHIVE_SDMC,fsMakePath(PATH_EMPTY,""),fsMakePath(PATH_ASCII,p),FS_OPEN_READ,0);
-	FSFILE_GetSize(fptr,&fileSize);
-	FSFILE_Read(fptr,NULL,1,buffer,sizeof(buffer));
-	*/
 
 	char *buffer = (char *)memalloc(fileSize + 1);
-	buffer[fileSize] = 0;
-	size_t bytesRead = fread(buffer,1,fileSize,fptr);
-	//printTop("Sent: %s\n",buffer);
-	if(fileSize!=bytesRead) failExit("Error reading file");
-	//FSFILE_Close(fptr);
+	size_t bytesRead = fread(buffer, 1, fileSize, fptr);
 	fclose(fptr);
+	if (fileSize != bytesRead)
+		failExit("Error reading file");
+
+	buffer[fileSize] = 0;
+	*out_size = fileSize;
 	return buffer;
 }
+
+// Accept only absolute paths with no ".." segment and no backslash.
+static int path_is_safe(const char *p)
+{
+	if (p[0] != '/' || strchr(p, '\\'))
+		return 0;
+
+	const char *seg = p;
+	while (*seg)
+	{
+		const char *end = strchr(seg, '/');
+		size_t len = end ? (size_t)(end - seg) : strlen(seg);
+
+		if (len == 2 && seg[0] == '.' && seg[1] == '.')
+			return 0;
+		if (!end)
+			break;
+		seg = end + 1;
+	}
+	return 1;
+}
+
+static http_response *make_response(int code, const char *mime, char *payload, size_t len)
+{
+	char header[96];
+	int hlen = snprintf(header, sizeof(header), "Content-Type: %s\r\n", mime);
+
+	http_response *response = memalloc(sizeof(http_response));
+	response->code = code;
+	response->content_type = memdup(header, hlen + 1);
+	response->payload = payload;
+	response->payload_len = len;
+	return response;
+}
+
+static http_response *make_error(int code, const char *msg)
+{
+	size_t len = strlen(msg);
+	return make_response(code, "text/plain; charset=utf-8", memdup(msg, len + 1), len);
+}
+
 http_response *get_sdcard_response(http_request *request)
 {
-	http_response *response = memalloc(sizeof(http_response));
+	char rel[200];
+	snprintf(rel, sizeof(rel), "%s", request->path);
+	rel[strcspn(rel, "?#")] = '\0';
+
+	if (!path_is_safe(rel))
+		return make_error(403, "Forbidden");
+
 	char path[256];
-	snprintf(path, sizeof(path), "sdmc:/3ds/www%s", request->path);
-	char *payload = do_sdcard_request(path);
-	response->code = (payload == NULL) ? 200 : 404;
-	// const char content_type[] = "Content-Type: text/html\r\n";
-	// response->content_type = memdup(content_type, sizeof(content_type));
-	response->payload = payload;
-	response->payload_len = strlen(payload);
-	return response;    
+	int n = snprintf(path, sizeof(path), WWW_ROOT "%s", rel);
+	if (n < 0 || (size_t)n >= sizeof(path))
+		return make_error(414, "Request-URI Too Long");
+
+	// Directories (including "/") serve index.html
+	struct stat st;
+	if (stat(path, &st) == 0 && S_ISDIR(st.st_mode))
+	{
+		const char *suffix = (path[n - 1] == '/') ? "index.html" : "/index.html";
+		if ((size_t)n + strlen(suffix) >= sizeof(path))
+			return make_error(414, "Request-URI Too Long");
+		strcat(path, suffix);
+	}
+
+	size_t size = 0;
+	char *payload = do_sdcard_request(path, &size);
+	if (payload == NULL)
+		return make_error(404, "Not Found");
+
+	return make_response(200, get_mime_type(path), payload, size);
 }
