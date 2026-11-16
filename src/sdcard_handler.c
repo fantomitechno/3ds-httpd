@@ -1,4 +1,5 @@
 #include "handlers.h"
+#include <3ds.h>
 
 int is_sdcard_handler(http_request *request)
 {
@@ -42,7 +43,9 @@ char *do_sdcard_request(char *path)
 http_response *get_sdcard_response(http_request *request)
 {
 	http_response *response = memalloc(sizeof(http_response));
-	char * payload = do_sdcard_request(strcat("/sdcard/3ds/www", request->path));
+	char * path = strcat("/sdcard/3ds/www", request->path);
+	printTop(path);
+	char * payload = do_sdcard_request(path);
 	response->code = (payload == NULL) ? 200 : 404;
 	const char content_type[] = "Content-Type: text/html\r\n";
 	response->content_type = memdup(content_type, sizeof(content_type));
