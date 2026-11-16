@@ -2,14 +2,14 @@
 
 int is_sdcard_handler(http_request *request)
 {
-	if (!(startWith(request->path, "/sdcard/") && strlen(request->path) > 8)) 
+	if (startWith(request->path, "/system/") && strlen(request->path) > 7)
 		return 0;
 
 	return 1;
 }
 char *do_sdcard_request(char *path)
 {
-	const char *realPath = strchr(strchr(path, '/') + 1, '/');
+	const char *realPath = path;
 	
 	FILE *fptr = fopen(realPath,"r");
 	//Thanks to Evie for helping me clean this clusterf*ck
@@ -42,7 +42,7 @@ char *do_sdcard_request(char *path)
 http_response *get_sdcard_response(http_request *request)
 {
 	http_response *response = memalloc(sizeof(http_response));
-	char * payload = do_sdcard_request(request->path);
+	char * payload = do_sdcard_request(strcat("/3ds/www", request->path));
 	response->code = (payload == NULL) ? 200 : 404;
 	const char content_type[] = "Content-Type: text/html\r\n";
 	response->content_type = memdup(content_type, sizeof(content_type));
