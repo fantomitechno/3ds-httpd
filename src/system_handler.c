@@ -14,24 +14,18 @@ int is_system_request(http_request *request)
 
 http_response *get_system_handler_response(http_request *request)
 {
-	if (!strcmp(request->path, "/system/info"))
-	{
-		http_response *response = memalloc(sizeof(http_response));
-		response->code = 200;
-		const char content_type[] = "Content-Type: text/html\r\n";
-		response->content_type = memdup(content_type, sizeof(content_type));
-		char	*payload = memalloc(1024 * sizeof(char));
-		sprintf(payload, "<html><title>System info</title><h1>Yes this is running on a 3DS</h1><p>Running firmware %lu</p></html>", osGetFirmVersion());
-		response->payload = payload;
-			response->payload_len = strlen(response->payload);
-		return response;
-	}
 	http_response *response = memalloc(sizeof(http_response));
 	response->code = 200;
 	const char content_type[] = "Content-Type: text/html\r\n";
 	response->content_type = memdup(content_type, sizeof(content_type));
 	char	*payload = memalloc(1024 * sizeof(char));
-	sprintf(payload, "OK");
+	if (!strcmp(request->path, "/system/info"))
+	{
+		sprintf(payload, "<html><title>System info</title><h1>Yes this is running on a 3DS</h1><p>Running firmware %lu</p></html>", osGetFirmVersion());
+	} else
+	{
+		sprintf(payload, "OK");
+	}
 	response->payload = payload;
 	response->payload_len = strlen(response->payload);
 	return response;
