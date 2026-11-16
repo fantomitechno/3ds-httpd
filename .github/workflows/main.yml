@@ -47,15 +47,3 @@ jobs:
         with:
           path: ~/artifacts/*
           name: build
-      - name: Publish pre-release 
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "nightly"
-          prerelease: true
-          title: "Nightly Build"
-          files: |
-            3ds-httpd.3dsx
-            3ds-httpd.elf
-            3ds-httpd.smdh
-            3ds-httpd.cia
